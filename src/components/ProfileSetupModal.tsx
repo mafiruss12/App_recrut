@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { User, Building2, MapPin, Briefcase, CheckCircle2 } from 'lucide-react';
 import { Commercial } from '../types';
 import { storage } from '../lib/storage';
@@ -29,7 +29,7 @@ export function ProfileSetupModal({ isOpen, user, onSave }: ProfileSetupModalPro
 
   if (!isOpen || !user) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !cabinet.trim() || !localite.trim()) {
       setError('Veuillez remplir obligatoirement tous les champs requis.');

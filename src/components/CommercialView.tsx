@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type FormEvent } from 'react';
 import {
   Phone,
   UserCheck,
@@ -76,7 +76,7 @@ export function CommercialView({
     );
   }, [personalClients, searchFilter]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!phoneInput.trim()) return;
 

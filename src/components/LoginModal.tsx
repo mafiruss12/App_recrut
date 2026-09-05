@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Phone, Lock, LogIn, AlertCircle, ShieldAlert, Check } from 'lucide-react';
 import { storage } from '../lib/storage';
 import { Commercial } from '../types';
@@ -18,7 +18,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent, forceTakeover = false) => {
+  const handleSubmit = async (e: FormEvent, forceTakeover = false) => {
     e.preventDefault();
     setError(null);
     setSessionLocked(false);

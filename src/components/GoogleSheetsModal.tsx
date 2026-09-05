@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { FileSpreadsheet, Send, CheckCircle2, AlertCircle, Copy, ExternalLink } from 'lucide-react';
 import { storage } from '../lib/storage';
 
@@ -25,7 +25,7 @@ export function GoogleSheetsModal({ isOpen, onClose, onSuccess }: GoogleSheetsMo
 
   if (!isOpen) return null;
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = (e: FormEvent) => {
     e.preventDefault();
     storage.saveSettings({
       googleSheetsWebhookUrl: webhookUrl.trim(),
