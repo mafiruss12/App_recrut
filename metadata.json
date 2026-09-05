@@ -1,0 +1,6 @@
+{
+  "name": "K2L Suivi Recrutement",
+  "description": "Application web et mobile PWA pour le suivi de recrutement K2L : saisie rapide, contrôle des doublons, mode hors ligne, statistiques temps réel et synchronisation Google Sheets & Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
