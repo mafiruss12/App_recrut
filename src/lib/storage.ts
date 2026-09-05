@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   CLIENTS: 'k2l_clients_v1',
   OFFLINE_QUEUE: 'k2l_offline_queue_v1',
   CURRENT_USER: 'k2l_current_user_v1',
+  BOSS_SESSION: 'k2l_boss_session_v1',
   SETTINGS: 'k2l_settings_v1',
   STATS: 'k2l_stats_v1',
 };
@@ -265,6 +266,39 @@ export class StorageService {
     } else {
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
     }
+  }
+
+  public isBossAuthenticated(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.BOSS_SESSION);
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      return data?.authenticated === true && Date.now() - (data?.timestamp || 0) < 24 * 3600 * 1000;
+    } catch {
+      return false;
+    }
+  }
+
+  public authenticateBoss(pinOrCode: string): { success: boolean; error?: string } {
+    const clean = pinOrCode.trim();
+    // Manager access codes: 2026 or special direction codes
+    if (clean === '2026' || clean === 'K2L2026' || clean === 'BOSS2026' || clean === 'K2L@BOSS') {
+      localStorage.setItem(
+        STORAGE_KEYS.BOSS_SESSION,
+        JSON.stringify({
+          authenticated: true,
+          timestamp: Date.now(),
+        })
+      );
+      return { success: true };
+    }
+    return { success: false, error: 'Code d’accès Direction incorrect' };
+  }
+
+  public logoutBoss(): void {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(STORAGE_KEYS.BOSS_SESSION);
   }
 
   /**

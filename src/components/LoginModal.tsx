@@ -47,11 +47,6 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
     }
   };
 
-  const handleQuickCommercial = (p: string, c: string) => {
-    setPhone(p);
-    setCode(c);
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
       <div className="backdrop-blur-2xl bg-slate-900/90 border border-white/15 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
@@ -118,14 +113,14 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-              Code Fixe Personnel (ou PIN Manager)
+              Code Fixe Personnel
             </label>
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
               <input
                 type="password"
                 required
-                placeholder="4 chiffres ou PIN"
+                placeholder="Votre code personnel (4 chiffres)"
                 value={code}
                 onChange={e => setCode(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950/60 border border-white/15 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500 font-mono tracking-widest"
@@ -142,29 +137,6 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
             <span>{isLoading ? 'Vérification...' : 'Se Connecter'}</span>
           </button>
         </form>
-
-        {/* Quick Demo Credentials */}
-        <div className="mt-6 pt-4 border-t border-white/10">
-          <p className="text-[11px] text-slate-400 mb-2 font-medium">Comptes de test pré-configurés :</p>
-          <div className="grid grid-cols-2 gap-2 text-[11px]">
-            <button
-              type="button"
-              onClick={() => handleQuickCommercial('0708091011', '1234')}
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-left border border-white/10 text-slate-300 transition-colors"
-            >
-              <div className="font-semibold text-white">Mafi Russ (Commercial)</div>
-              <div className="text-slate-400">Tél: 0708091011 • Code: 1234</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickCommercial('0505050505', '2026')}
-              className="p-2 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-left border border-indigo-500/20 text-indigo-200 transition-colors"
-            >
-              <div className="font-semibold text-white">Direction (Manager)</div>
-              <div className="text-indigo-300">Code PIN Boss: 2026</div>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
