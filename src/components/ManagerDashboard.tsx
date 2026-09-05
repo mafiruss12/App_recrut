@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { ClientEntry, Commercial } from '../types';
 import { storage } from '../lib/storage';
+import { CommercialManagement } from './CommercialManagement';
 
 
 interface ManagerDashboardProps {
@@ -650,6 +651,7 @@ export function ManagerDashboard({
           </table>
         </div>
       </div>
+      <CommercialManagement organizationId={storage.getCurrentUser()?.organization_id} />
     </div>
   );
 }

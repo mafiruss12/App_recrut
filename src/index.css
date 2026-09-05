@@ -7,44 +7,44 @@
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
-  .glass-panel-hover {
-    transition: all 0.2s ease;
-  }
-  .glass-panel-hover:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.18);
-  }
-  .glass-panel-accent {
-    background: rgba(79, 70, 229, 0.08);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(99, 102, 241, 0.25);
-  }
-  .glass-input {
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #f8fafc;
-    transition: all 0.2s ease;
-  }
-  .glass-input:focus {
-    outline: none;
-    border-color: rgba(129, 140, 248, 0.6);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-  }
+  .glass-panel-hover { transition: all 0.2s ease; }
+  .glass-panel-hover:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.18); }
+  .glass-panel-accent { background: rgba(79, 70, 229, 0.08); backdrop-filter: blur(16px); border: 1px solid rgba(99, 102, 241, 0.25); }
+  .glass-input { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.12); color: #f8fafc; transition: all 0.2s ease; }
+  .glass-input:focus { outline: none; border-color: rgba(129, 140, 248, 0.6); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
 }
 
-/* Custom scrollbar for frosted glass tables */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
+/* Clean SaaS visual system for the operational portals. */
+.k2l-modern { background: #f5f7fb; }
+.k2l-modern .text-white { color: #0f172a !important; }
+.k2l-modern .text-slate-100,
+.k2l-modern .text-slate-200 { color: #1e293b !important; }
+.k2l-modern .text-slate-300 { color: #475569 !important; }
+.k2l-modern .text-slate-400 { color: #64748b !important; }
+.k2l-modern .text-slate-500 { color: #64748b !important; }
+.k2l-modern .text-slate-600 { color: #94a3b8 !important; }
+.k2l-modern .bg-white\/5 { background-color: rgba(255, 255, 255, 0.86) !important; }
+.k2l-modern .bg-white\/10 { background-color: rgba(255, 255, 255, 0.96) !important; }
+.k2l-modern .bg-slate-900\/60,
+.k2l-modern .bg-slate-900\/70,
+.k2l-modern .bg-slate-950\/60,
+.k2l-modern .bg-slate-950\/70 { background-color: #ffffff !important; }
+.k2l-modern .border-white\/10,
+.k2l-modern .border-white\/15 { border-color: #e2e8f0 !important; }
+.k2l-modern .border-white\/5 { border-color: #eef2f7 !important; }
+.k2l-modern header { background-color: rgba(255, 255, 255, 0.92) !important; border-color: #e2e8f0 !important; }
+.k2l-modern table thead { background-color: #f8fafc !important; }
+.k2l-modern input,
+.k2l-modern select { color: #0f172a !important; }
+.k2l-modern input::placeholder { color: #94a3b8 !important; }
+.k2l-modern button.bg-indigo-600,
+.k2l-modern button.bg-indigo-500,
+.k2l-modern button.bg-emerald-600,
+.k2l-modern button.bg-red-500,
+.k2l-modern .bg-indigo-600.text-white,
+.k2l-modern .bg-indigo-500.text-white { color: #ffffff !important; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.08); }
+::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.35); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(79, 70, 229, 0.5); }

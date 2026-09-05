@@ -1,10 +1,13 @@
-export function FrostedBackground() {
+export function FrostedBackground({ dark = false }: { dark?: boolean }) {
+  if (dark) {
+    return <div className="fixed inset-0 z-0 bg-slate-950 pointer-events-none" />;
+  }
+
   return (
     <>
-      <div className="fixed inset-0 z-0 bg-gradient-to-br from-[#1e293b] via-[#0f172a] to-[#312e81] pointer-events-none" />
-      <div className="fixed top-[-100px] left-[-100px] w-[420px] h-[420px] bg-blue-500/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="fixed bottom-[-100px] right-[-100px] w-[420px] h-[420px] bg-indigo-500/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="fixed top-[40%] right-[15%] w-[320px] h-[320px] bg-sky-500/10 rounded-full blur-[100px] pointer-events-none" />
+      <div className="fixed inset-0 z-0 bg-[#f5f7fb] pointer-events-none" />
+      <div className="fixed -top-32 -right-20 h-[420px] w-[420px] rounded-full bg-indigo-200/35 blur-[110px] pointer-events-none" />
+      <div className="fixed -bottom-40 -left-20 h-[420px] w-[420px] rounded-full bg-cyan-100/70 blur-[120px] pointer-events-none" />
     </>
   );
 }

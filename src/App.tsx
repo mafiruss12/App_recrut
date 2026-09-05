@@ -8,19 +8,27 @@ import { BossLogin } from './components/BossLogin';
 import { LoginModal } from './components/LoginModal';
 import { ProfileSetupModal } from './components/ProfileSetupModal';
 import { GoogleSheetsModal } from './components/GoogleSheetsModal';
+import { LandingPage } from './components/LandingPage';
+import { SuperAdminLogin } from './components/SuperAdminLogin';
+import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { Commercial } from './types';
 import { storage } from './lib/storage';
 import { isSupabaseConfigured } from './lib/supabase';
 import { LogIn, AlertCircle, LoaderCircle } from 'lucide-react';
 
-function getPortalFromLocation(): 'commercial' | 'boss' {
-  if (typeof window === 'undefined') return 'commercial';
+type Portal = 'landing' | 'commercial' | 'boss' | 'super-admin';
+
+function getPortalFromLocation(): Portal {
+  if (typeof window === 'undefined') return 'landing';
   const path = window.location.pathname.toLowerCase().replace(/\/$/, '');
-  return ['/boss', '/manager', '/admin'].includes(path) ? 'boss' : 'commercial';
+  if (path === '/super-admin') return 'super-admin';
+  if (['/boss', '/manager', '/admin'].includes(path)) return 'boss';
+  if (path === '/commercial') return 'commercial';
+  return 'landing';
 }
 
 export default function App() {
-  const [portal, setPortal] = useState<'commercial' | 'boss'>(getPortalFromLocation);
+  const [portal, setPortal] = useState<Portal>(getPortalFromLocation);
   const [isBossAuth, setIsBossAuth] = useState(false);
   const [currentUser, setCurrentUser] = useState<Commercial | null>(null);
   const [isBooting, setIsBooting] = useState(true);
@@ -51,7 +59,7 @@ export default function App() {
           const profile = await storage.restoreSession();
           if (!disposed && profile) {
             setCurrentUser(profile);
-            setIsBossAuth(profile.role === 'manager');
+            setIsBossAuth(profile.role === 'admin' || profile.role === 'manager');
           }
         }
         if (!disposed) refreshLocalState();
@@ -118,7 +126,7 @@ export default function App() {
 
   const handleCommercialLoginSuccess = (user: Commercial, requiresProfile: boolean) => {
     setCurrentUser(user);
-    setIsBossAuth(user.role === 'manager');
+    setIsBossAuth(user.role === 'admin' || user.role === 'manager');
     if (requiresProfile) setProfileModalOpen(true);
     void handleRefresh();
   };
@@ -129,14 +137,29 @@ export default function App() {
     refreshLocalState();
   };
 
-  const navigateToPortal = (target: 'commercial' | 'boss') => {
-    const newPath = target === 'boss' ? '/boss' : '/';
-    window.history.pushState({}, '', newPath);
+  const navigateToPortal = (target: Portal) => {
+    const path = target === 'boss' ? '/admin' : target === 'super-admin' ? '/super-admin' : target === 'commercial' ? '/commercial' : '/';
+    window.history.pushState({}, '', path);
     setPortal(target);
     setIsBossAuth(target === 'boss' && storage.isBossAuthenticated());
   };
 
-  const appContent = portal === 'boss' ? (
+  const appContent = portal === 'landing' ? (
+    <LandingPage
+      onOpenCommercial={() => navigateToPortal('commercial')}
+      onOpenAdmin={() => navigateToPortal('boss')}
+      onOpenSuperAdmin={() => navigateToPortal('super-admin')}
+    />
+  ) : portal === 'super-admin' ? (
+    currentUser?.role !== 'super_admin' ? (
+      <SuperAdminLogin
+        onSuccess={user => { setCurrentUser(user); void handleRefresh(); }}
+        onBack={() => navigateToPortal('landing')}
+      />
+    ) : (
+      <SuperAdminDashboard user={currentUser} onLogout={() => void handleBossLogout()} />
+    )
+  ) : portal === 'boss' ? (
     !isBossAuth ? (
       <BossLogin
         onSuccess={user => {
@@ -159,7 +182,7 @@ export default function App() {
           <ManagerDashboard
             onRefresh={() => void handleRefresh()}
             onOpenGoogleSheets={() => setSheetsModalOpen(true)}
-            onOpenNewEntry={() => window.open('/', '_blank', 'noopener,noreferrer')}
+            onOpenNewEntry={() => window.open('/commercial', '_blank', 'noopener,noreferrer')}
           />
         </main>
         <GoogleSheetsModal
@@ -180,7 +203,7 @@ export default function App() {
         pendingQueueCount={pendingQueueCount}
       />
       <main className="flex-1 flex flex-col z-10">
-        {currentUser ? (
+        {currentUser?.role === 'commercial' ? (
           <CommercialView
             currentUser={currentUser}
             onRefresh={() => void handleRefresh()}
@@ -189,38 +212,24 @@ export default function App() {
             pendingCount={pendingQueueCount}
           />
         ) : (
-          <div className="flex-1 flex items-center justify-center p-6 text-center">
-            <div className="backdrop-blur-xl bg-white/5 border border-white/10 p-8 rounded-3xl max-w-md w-full shadow-2xl">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-600/30 border border-indigo-500/40 text-indigo-400 flex items-center justify-center mx-auto mb-4 font-bold text-2xl">
-                K2
-              </div>
-              <h2 className="text-xl font-bold text-white mb-2">Connexion Commercial Terrain</h2>
-              <p className="text-xs text-slate-400 mb-6">
-                Connectez-vous avec votre téléphone et votre mot de passe Supabase pour accéder à la saisie terrain.
-              </p>
-              <button
-                onClick={() => setLoginModalOpen(true)}
-                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Se connecter</span>
-              </button>
+          <div className="flex-1 flex items-center justify-center p-6 text-center bg-slate-50">
+            <div className="p-8 rounded-3xl max-w-md w-full bg-white border border-slate-200 shadow-xl">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-4 font-black text-2xl">K2</div>
+              <h2 className="text-xl font-black text-slate-950 mb-2">Espace Commercial</h2>
+              <p className="text-sm text-slate-500 mb-6">Connectez-vous avec votre téléphone et votre code personnel pour accéder à vos saisies terrain.</p>
+              <button onClick={() => setLoginModalOpen(true)} className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all"><LogIn className="w-4 h-4" />Se connecter</button>
             </div>
           </div>
         )}
       </main>
-      <LoginModal
-        isOpen={loginModalOpen}
-        onClose={() => setLoginModalOpen(false)}
-        onSuccess={handleCommercialLoginSuccess}
-      />
+      <LoginModal isOpen={loginModalOpen} onClose={() => setLoginModalOpen(false)} onSuccess={handleCommercialLoginSuccess} />
       <ProfileSetupModal isOpen={profileModalOpen} user={currentUser} onSave={handleProfileSave} />
     </>
   );
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-indigo-600 selection:text-white">
-      <FrostedBackground />
+    <div className={`min-h-screen text-slate-900 flex flex-col font-sans relative overflow-x-hidden selection:bg-indigo-600 selection:text-white ${portal === 'super-admin' ? 'bg-slate-950' : portal === 'commercial' || portal === 'boss' ? 'k2l-modern' : ''}`}>
+      <FrostedBackground dark={portal === 'super-admin'} />
       {isBooting ? (
         <div className="flex-1 flex items-center justify-center gap-3 text-slate-300 z-10">
           <LoaderCircle className="w-5 h-5 animate-spin text-indigo-400" />
@@ -228,7 +237,7 @@ export default function App() {
         </div>
       ) : (
         <>
-          {!isSupabaseConfigured && (
+          {!isSupabaseConfigured && portal !== 'landing' && (
             <div className="relative z-30 mx-auto mt-3 max-w-2xl px-4 w-full">
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200 flex gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />

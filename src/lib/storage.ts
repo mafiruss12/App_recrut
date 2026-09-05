@@ -1,4 +1,4 @@
-import { ClientEntry, Commercial, DuplicateCheckResult, AppSettings } from '../types';
+import { ClientEntry, Commercial, DuplicateCheckResult, AppSettings, Organization } from '../types';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { clearCache, readCache, removeCache, writeCache } from './local-db';
 
@@ -43,13 +43,14 @@ function asCommercial(row: Record<string, unknown>): Commercial {
   return {
     id: String(row.id ?? ''),
     user_id: row.user_id ? String(row.user_id) : undefined,
+    organization_id: row.organization_id ? String(row.organization_id) : null,
     phone: String(row.phone ?? ''),
     name: String(row.name ?? ''),
     localite: String(row.localite ?? ''),
     cabinet: String(row.cabinet ?? ''),
     partenaire: String(row.partenaire ?? ''),
     action: String(row.action ?? ''),
-    role: row.role === 'manager' ? 'manager' : 'commercial',
+    role: row.role === 'super_admin' ? 'super_admin' : row.role === 'admin' || row.role === 'manager' ? 'admin' : 'commercial',
     is_active: row.is_active !== false,
     created_at: String(row.created_at ?? new Date().toISOString()),
     last_active_at: String(row.last_active_at ?? new Date().toISOString()),
@@ -59,6 +60,7 @@ function asCommercial(row: Record<string, unknown>): Commercial {
 function asClient(row: Record<string, unknown>): ClientEntry {
   return {
     id: String(row.id ?? ''),
+    organization_id: row.organization_id ? String(row.organization_id) : null,
     client_phone: String(row.client_phone ?? ''),
     client_phone_clean: String(row.client_phone_clean ?? normalizePhone(String(row.client_phone ?? ''))),
     commercial_id: String(row.commercial_id ?? ''),
@@ -159,7 +161,7 @@ export class StorageService {
   }
 
   public isBossAuthenticated(): boolean {
-    return this.currentUser?.role === 'manager' && this.currentUser.is_active;
+    return Boolean(this.currentUser && ['admin', 'manager', 'super_admin'].includes(this.currentUser.role) && this.currentUser.is_active);
   }
 
   public async login(
@@ -236,7 +238,7 @@ export class StorageService {
   private async getProfile(userId: string): Promise<Commercial | null> {
     const { data, error } = await supabase
       .from('commerciaux')
-      .select('id,user_id,phone,name,localite,cabinet,partenaire,action,role,is_active,created_at,last_active_at')
+      .select('id,user_id,organization_id,phone,name,localite,cabinet,partenaire,action,role,is_active,created_at,last_active_at')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -267,7 +269,7 @@ export class StorageService {
       .from('commerciaux')
       .update({ ...sanitized, last_active_at: new Date().toISOString() })
       .eq('id', userId)
-      .select('id,user_id,phone,name,localite,cabinet,partenaire,action,role,is_active,created_at,last_active_at')
+      .select('id,user_id,organization_id,phone,name,localite,cabinet,partenaire,action,role,is_active,created_at,last_active_at')
       .single();
 
     if (error || !data) throw new Error(error?.message || 'Profil introuvable.');
@@ -283,7 +285,10 @@ export class StorageService {
     const clean = normalizePhone(rawClientPhone);
     if (!clean || clean.length < 8) return { isDuplicate: false };
 
-    const existing = [...this.clients, ...this.offlineQueue].find(client => client.client_phone_clean === clean);
+    const organizationId = this.currentUser?.organization_id ?? null;
+    const existing = [...this.clients, ...this.offlineQueue].find(client =>
+      client.client_phone_clean === clean && (!organizationId || client.organization_id === organizationId)
+    );
     if (!existing) return { isDuplicate: false };
 
     const date = new Date(existing.created_at).toLocaleString('fr-FR');
@@ -334,7 +339,7 @@ export class StorageService {
 
     const { data: commercialRows, error: commercialsError } = await supabase
       .from('commerciaux')
-      .select('id,user_id,phone,name,localite,cabinet,partenaire,action,role,is_active,created_at,last_active_at')
+      .select('id,user_id,organization_id,phone,name,localite,cabinet,partenaire,action,role,is_active,created_at,last_active_at')
       .order('created_at', { ascending: true });
     if (commercialsError) return { success: false, error: commercialsError.message };
 
@@ -370,6 +375,7 @@ export class StorageService {
 
     const entry: ClientEntry = {
       id: makeId(),
+      organization_id: commercial.organization_id ?? null,
       client_phone: formatPhoneDisplay(cleanPhone),
       client_phone_clean: cleanPhone,
       commercial_id: commercial.id,
@@ -432,6 +438,7 @@ export class StorageService {
       } else {
         const { error } = await supabase.from('clients').upsert({
           id: item.id,
+          organization_id: item.organization_id ?? this.currentUser.organization_id,
           client_phone: item.client_phone,
           client_phone_clean: item.client_phone_clean,
           commercial_id: item.commercial_id,
@@ -520,6 +527,44 @@ export class StorageService {
 
   private async sendToGoogleSheets(item: ClientEntry): Promise<void> {
     await this.syncClientsToGoogleSheets([item]);
+  }
+
+  public async getOrganizations(): Promise<Organization[]> {
+    if (!isSupabaseConfigured) return [];
+    const { data, error } = await supabase.from('organizations').select('id,name,slug,is_active,created_at').order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(row => ({
+      id: String(row.id),
+      name: String(row.name ?? ''),
+      slug: String(row.slug ?? ''),
+      is_active: row.is_active !== false,
+      created_at: String(row.created_at ?? ''),
+    }));
+  }
+
+  public async provisionCommercial(input: { phone: string; name: string; organizationId: string; cabinet?: string; localite?: string }): Promise<{ user: Commercial; code: string }> {
+    const { data, error } = await supabase.functions.invoke('provision-commercial', {
+      body: { phone: input.phone, name: input.name, organization_id: input.organizationId, cabinet: input.cabinet ?? '', localite: input.localite ?? '' },
+    });
+    if (error || !data?.profile || !data?.code) throw new Error(error?.message || 'Création du commercial impossible.');
+    return { user: asCommercial(data.profile as Record<string, unknown>), code: String(data.code) };
+  }
+
+  public async createOrganization(name: string): Promise<Organization> {
+    const cleanName = name.trim().slice(0, 150);
+    if (!cleanName) throw new Error('Le nom de l’organisation est obligatoire.');
+    const slug = cleanName.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const { data, error } = await supabase.from('organizations').insert({ name: cleanName, slug }).select('id,name,slug,is_active,created_at').single();
+    if (error || !data) throw new Error(error?.message || 'Création de l’organisation impossible.');
+    return { id: String(data.id), name: String(data.name), slug: String(data.slug), is_active: data.is_active !== false, created_at: String(data.created_at) };
+  }
+
+  public async provisionAdmin(input: { phone: string; name: string; organizationId: string }): Promise<{ user: Commercial; temporaryPassword: string }> {
+    const { data, error } = await supabase.functions.invoke('provision-admin', {
+      body: { phone: input.phone, name: input.name, organization_id: input.organizationId },
+    });
+    if (error || !data?.profile || !data?.temporary_password) throw new Error(error?.message || 'Création de l’administrateur impossible.');
+    return { user: asCommercial(data.profile as Record<string, unknown>), temporaryPassword: String(data.temporary_password) };
   }
 
   public getDuplicatesAvoidedCount(): number {

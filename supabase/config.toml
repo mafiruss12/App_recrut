@@ -1,0 +1,7 @@
+project_id = "wfeygwvvvyjomyahdgrc"
+
+[functions.provision-commercial]
+verify_jwt = true
+
+[functions.provision-admin]
+verify_jwt = true

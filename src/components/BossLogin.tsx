@@ -23,7 +23,7 @@ export function BossLogin({ onSuccess, onGoToCommercial }: BossLoginProps) {
       const result = await storage.login(phone, password);
       if (!result.success || !result.user) {
         setError(result.error || 'Identifiants invalides.');
-      } else if (result.user.role !== 'manager') {
+      } else if (result.user.role !== 'admin' && result.user.role !== 'manager') {
         await storage.logout();
         setError('Ce compte ne possède pas les droits Direction.');
       } else {

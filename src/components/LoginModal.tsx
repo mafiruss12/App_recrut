@@ -29,7 +29,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
         return;
       }
 
-      if (result.user.role === 'manager') {
+      if (result.user.role !== 'commercial') {
         setError('Utilisez le portail Direction pour ce compte.');
         await storage.logout();
         return;

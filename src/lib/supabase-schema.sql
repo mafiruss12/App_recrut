@@ -4,16 +4,26 @@
 
 create extension if not exists pgcrypto;
 
+create table if not exists public.organizations (
+  id uuid primary key default gen_random_uuid(),
+  name varchar(150) not null,
+  slug varchar(180) unique not null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default timezone('utc'::text, now())
+);
+
 create table if not exists public.commerciaux (
   id uuid primary key default gen_random_uuid(),
   user_id uuid unique references auth.users(id) on delete cascade,
+  organization_id uuid references public.organizations(id) on delete restrict,
   phone varchar(20) unique not null,
+  access_code_fingerprint varchar(64) unique,
   name varchar(255) not null default '',
   localite varchar(150) not null default '',
   cabinet varchar(150) not null default '',
   partenaire varchar(150) not null default '',
   action varchar(255) not null default '',
-  role varchar(20) not null default 'commercial' check (role in ('commercial', 'manager')),
+  role varchar(20) not null default 'commercial' check (role in ('commercial', 'admin', 'manager', 'super_admin')),
   is_active boolean not null default true,
   created_at timestamptz not null default timezone('utc'::text, now()),
   last_active_at timestamptz not null default timezone('utc'::text, now())
@@ -21,6 +31,9 @@ create table if not exists public.commerciaux (
 
 -- Migration depuis l'ancien modèle.
 alter table public.commerciaux add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table public.commerciaux add column if not exists organization_id uuid references public.organizations(id) on delete restrict;
+alter table public.commerciaux add column if not exists access_code_fingerprint varchar(64);
+create unique index if not exists commerciaux_access_code_fingerprint_unique on public.commerciaux(access_code_fingerprint) where access_code_fingerprint is not null;
 alter table public.commerciaux alter column name set default '';
 alter table public.commerciaux alter column localite set default '';
 alter table public.commerciaux alter column cabinet set default '';
@@ -29,7 +42,7 @@ alter table public.commerciaux alter column action set default '';
 alter table public.commerciaux alter column role set default 'commercial';
 update public.commerciaux
 set role = 'commercial'
-where role is null or role not in ('commercial', 'manager');
+where role is null or role not in ('commercial', 'admin', 'manager', 'super_admin');
 alter table public.commerciaux alter column role set not null;
 alter table public.commerciaux alter column is_active set default true;
 alter table public.commerciaux drop column if exists code;
@@ -38,6 +51,7 @@ create unique index if not exists commerciaux_user_id_unique on public.commercia
 
 create table if not exists public.clients (
   id uuid primary key default gen_random_uuid(),
+  organization_id uuid references public.organizations(id) on delete restrict,
   client_phone varchar(30) not null,
   client_phone_clean varchar(20) not null,
   commercial_id uuid not null references public.commerciaux(id) on delete restrict,
@@ -56,15 +70,17 @@ create table if not exists public.clients (
 
 -- Les anciennes lignes peuvent être orphelines après l’ancien ON DELETE SET NULL.
 -- Les nouvelles insertions sont protégées par la policy RLS et doivent toujours fournir commercial_id.
+alter table public.clients add column if not exists organization_id uuid references public.organizations(id) on delete restrict;
 alter table public.clients alter column synced_at drop default;
 
+create index if not exists idx_clients_organization_id on public.clients(organization_id);
 create index if not exists idx_clients_commercial_id on public.clients(commercial_id);
 create index if not exists idx_clients_created_at on public.clients(created_at desc);
 
 -- Conserve les historiques mais marque les doublons historiques avant la contrainte.
 with ranked_duplicates as (
   select id,
-         row_number() over (partition by client_phone_clean order by created_at asc, id asc) as row_number
+         row_number() over (partition by organization_id, client_phone_clean order by created_at asc, id asc) as row_number
   from public.clients
   where client_phone_clean is not null and client_phone_clean <> ''
 )
@@ -72,15 +88,29 @@ update public.clients
 set status = 'duplicate_blocked'
 where id in (select id from ranked_duplicates where row_number > 1);
 
-create unique index if not exists clients_phone_clean_unique
-on public.clients(client_phone_clean)
-where client_phone_clean <> '' and status <> 'duplicate_blocked';
+drop index if exists public.clients_phone_clean_unique;
+create unique index if not exists clients_organization_phone_clean_unique
+on public.clients(organization_id, client_phone_clean)
+where organization_id is not null and client_phone_clean <> '' and status <> 'duplicate_blocked';
 
 create table if not exists public.app_settings (
   key varchar(100) primary key,
   value jsonb not null,
   updated_at timestamptz not null default timezone('utc'::text, now())
 );
+
+create or replace function public.is_super_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.commerciaux
+    where user_id = auth.uid() and role = 'super_admin' and is_active = true
+  );
+$$;
 
 create or replace function public.is_manager()
 returns boolean
@@ -92,9 +122,20 @@ as $$
   select exists (
     select 1 from public.commerciaux
     where user_id = auth.uid()
-      and role = 'manager'
+      and role in ('admin', 'manager', 'super_admin')
       and is_active = true
   );
+$$;
+
+create or replace function public.current_organization_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select organization_id from public.commerciaux
+  where user_id = auth.uid() and is_active = true limit 1;
 $$;
 
 create or replace function public.current_commercial_id()
@@ -132,26 +173,36 @@ create trigger commerciaux_protect_privileges
 before update on public.commerciaux
 for each row execute function public.prevent_commercial_privilege_escalation();
 
+revoke all on function public.is_super_admin() from public;
 revoke all on function public.is_manager() from public;
+revoke all on function public.current_organization_id() from public;
 revoke all on function public.current_commercial_id() from public;
 revoke all on function public.prevent_commercial_privilege_escalation() from public;
+grant execute on function public.is_super_admin() to authenticated;
 grant execute on function public.is_manager() to authenticated;
+grant execute on function public.current_organization_id() to authenticated;
 grant execute on function public.current_commercial_id() to authenticated;
 
+alter table public.organizations enable row level security;
 alter table public.commerciaux enable row level security;
 alter table public.clients enable row level security;
 alter table public.app_settings enable row level security;
 
 -- Aucun accès anonyme à des données de recrutement.
+revoke all on table public.organizations from anon;
 revoke all on table public.commerciaux from anon;
 revoke all on table public.clients from anon;
 revoke all on table public.app_settings from anon;
-grant select on table public.commerciaux, public.clients to authenticated;
+grant select on table public.organizations, public.commerciaux, public.clients to authenticated;
+grant insert, update on table public.organizations to authenticated;
 grant update (name, localite, cabinet, partenaire, action, last_active_at) on public.commerciaux to authenticated;
 grant insert on table public.commerciaux to authenticated;
 grant insert, update, delete on table public.clients to authenticated;
 grant all on table public.app_settings to authenticated;
 
+drop policy if exists organizations_select_authenticated on public.organizations;
+drop policy if exists organizations_insert_super_admin on public.organizations;
+drop policy if exists organizations_update_super_admin on public.organizations;
 drop policy if exists "Allow anon read/write on commerciaux" on public.commerciaux;
 drop policy if exists "Allow anon read/write on clients" on public.clients;
 drop policy if exists "Allow anon read/write on app_settings" on public.app_settings;
@@ -164,40 +215,76 @@ drop policy if exists clients_update_manager on public.clients;
 drop policy if exists clients_delete_manager on public.clients;
 drop policy if exists settings_manager_only on public.app_settings;
 
+create policy organizations_select_authenticated
+on public.organizations for select to authenticated
+using (public.is_super_admin() or id = public.current_organization_id());
+
+create policy organizations_insert_super_admin
+on public.organizations for insert to authenticated
+with check (public.is_super_admin());
+
+create policy organizations_update_super_admin
+on public.organizations for update to authenticated
+using (public.is_super_admin())
+with check (public.is_super_admin());
+
 create policy commerciaux_select_authenticated
 on public.commerciaux for select to authenticated
-using (user_id = auth.uid() or public.is_manager());
+using (
+  user_id = auth.uid()
+  or public.is_super_admin()
+  or (public.is_manager() and organization_id = public.current_organization_id())
+);
 
 create policy commerciaux_update_authenticated
 on public.commerciaux for update to authenticated
-using (user_id = auth.uid() or public.is_manager())
-with check (user_id = auth.uid() or public.is_manager());
+using (
+  user_id = auth.uid()
+  or public.is_super_admin()
+  or (public.is_manager() and organization_id = public.current_organization_id())
+)
+with check (
+  user_id = auth.uid()
+  or public.is_super_admin()
+  or (public.is_manager() and organization_id = public.current_organization_id())
+);
 
 create policy commerciaux_insert_manager
 on public.commerciaux for insert to authenticated
-with check (public.is_manager());
+with check (
+  public.is_super_admin()
+  or (public.is_manager() and organization_id = public.current_organization_id())
+);
 
 create policy clients_select_authenticated
 on public.clients for select to authenticated
-using (commercial_id = public.current_commercial_id() or public.is_manager());
+using (
+  commercial_id = public.current_commercial_id()
+  or public.is_super_admin()
+  or (public.is_manager() and organization_id = public.current_organization_id())
+);
 
 create policy clients_insert_authenticated
 on public.clients for insert to authenticated
-with check (commercial_id = public.current_commercial_id() or public.is_manager());
+with check (
+  commercial_id = public.current_commercial_id()
+  or public.is_super_admin()
+  or (public.is_manager() and organization_id = public.current_organization_id())
+);
 
 create policy clients_update_manager
 on public.clients for update to authenticated
-using (public.is_manager())
-with check (public.is_manager());
+using (public.is_super_admin() or (public.is_manager() and organization_id = public.current_organization_id()))
+with check (public.is_super_admin() or (public.is_manager() and organization_id = public.current_organization_id()));
 
 create policy clients_delete_manager
 on public.clients for delete to authenticated
-using (public.is_manager());
+using (public.is_super_admin() or (public.is_manager() and organization_id = public.current_organization_id()));
 
 create policy settings_manager_only
 on public.app_settings for all to authenticated
-using (public.is_manager())
-with check (public.is_manager());
+using (public.is_super_admin() or (public.is_manager() and (value->>'organization_id')::uuid = public.current_organization_id()))
+with check (public.is_super_admin() or (public.is_manager() and (value->>'organization_id')::uuid = public.current_organization_id()));
 
 -- Après création d'un compte dans Supabase Auth, l'administrateur doit le lier :
 -- update public.commerciaux set user_id = '<AUTH_USER_UUID>' where phone = '+225...';

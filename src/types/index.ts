@@ -1,11 +1,18 @@
-export type UserRole = 'commercial' | 'manager';
+export type UserRole = 'super_admin' | 'admin' | 'manager' | 'commercial';
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+}
 
 export interface Commercial {
   id: string;
   user_id?: string;
+  organization_id?: string | null;
   phone: string;
-  /** Never returned to the browser. Kept optional for legacy cache compatibility. */
-  code?: string;
   name: string;
   localite: string;
   cabinet: string;
@@ -21,6 +28,7 @@ export type ClientStatus = 'synced' | 'pending' | 'syncing' | 'failed' | 'duplic
 
 export interface ClientEntry {
   id: string;
+  organization_id?: string | null;
   client_phone: string;
   client_phone_clean: string;
   commercial_id: string;
