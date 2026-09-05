@@ -1,14 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Project credentials provided by the user
-export const SUPABASE_URL = 'https://wfeygwvvvyjomyahdgrc.supabase.co';
-export const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmZXlnd3Z2dnlqb215YWhkZ3JjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzODIwMzksImV4cCI6MjEwMzk1ODAzOX0._5X6_aUOYm6Id2S4l_67em0loXSF1qcwfR2b-B-2z_0';
+const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env ?? {};
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+/**
+ * Only the public Supabase URL and anon key belong in a browser bundle.
+ * The service-role key must never be added here or committed to the repository.
+ */
+export const SUPABASE_URL = env.VITE_SUPABASE_URL ?? '';
+export const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY ?? '';
+export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+
+// Keep module imports safe when someone opens the UI before configuring .env.
+const clientUrl = SUPABASE_URL || 'https://placeholder.supabase.co';
+const clientKey = SUPABASE_ANON_KEY || 'placeholder-anon-key';
+
+export const supabase = createClient(clientUrl, clientKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true,
   },
   global: {
     headers: {
@@ -17,37 +27,38 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 });
 
-/**
- * Checks if Supabase connection is healthy and if tables are ready.
- */
 export async function checkSupabaseConnection(): Promise<{
   connected: boolean;
   tablesReady: boolean;
   error?: string;
 }> {
-  try {
-    const start = Date.now();
-    const { data, error } = await supabase.from('clients').select('id').limit(1);
-    const latency = Date.now() - start;
+  if (!isSupabaseConfigured) {
+    return {
+      connected: false,
+      tablesReady: false,
+      error: 'Supabase n’est pas configuré. Renseignez VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY.',
+    };
+  }
 
+  try {
+    const { error } = await supabase.from('clients').select('id').limit(1);
     if (error) {
-      // If code is 42P01 (relation does not exist) or 404
       if (error.code === '42P01' || error.message.includes('does not exist')) {
         return {
           connected: true,
           tablesReady: false,
-          error: 'Les tables Supabase ne sont pas encore créées (SQL à exécuter).',
+          error: 'Les tables Supabase ne sont pas encore créées. Appliquez le schéma SQL.',
         };
       }
       return { connected: false, tablesReady: false, error: error.message };
     }
 
     return { connected: true, tablesReady: true };
-  } catch (err: any) {
+  } catch (error) {
     return {
       connected: false,
       tablesReady: false,
-      error: err?.message || 'Connexion réseau impossible vers Supabase',
+      error: error instanceof Error ? error.message : 'Connexion Supabase impossible.',
     };
   }
 }

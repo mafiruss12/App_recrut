@@ -25,11 +25,25 @@ export function GoogleSheetsModal({ isOpen, onClose, onSuccess }: GoogleSheetsMo
 
   if (!isOpen) return null;
 
+  const isValidWebhookUrl = (value: string) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' && (url.hostname === 'script.google.com' || url.hostname === 'script.googleusercontent.com');
+    } catch {
+      return false;
+    }
+  };
+
   const handleSave = (e: FormEvent) => {
     e.preventDefault();
+    const trimmedUrl = webhookUrl.trim();
+    if (trimmedUrl && !isValidWebhookUrl(trimmedUrl)) {
+      setTestStatus('Utilisez uniquement une URL HTTPS Google Apps Script valide.');
+      return;
+    }
     storage.saveSettings({
-      googleSheetsWebhookUrl: webhookUrl.trim(),
-      autoSyncGoogleSheets: autoSync,
+      googleSheetsWebhookUrl: trimmedUrl,
+      autoSyncGoogleSheets: autoSync && Boolean(trimmedUrl),
     });
     onSuccess();
     onClose();
@@ -38,6 +52,10 @@ export function GoogleSheetsModal({ isOpen, onClose, onSuccess }: GoogleSheetsMo
   const handleTestWebhook = async () => {
     if (!webhookUrl.trim()) {
       setTestStatus('Veuillez renseigner une URL de Webhook Google Apps Script.');
+      return;
+    }
+    if (!isValidWebhookUrl(webhookUrl.trim())) {
+      setTestStatus('Utilisez uniquement une URL HTTPS Google Apps Script valide.');
       return;
     }
 
@@ -58,15 +76,16 @@ export function GoogleSheetsModal({ isOpen, onClose, onSuccess }: GoogleSheetsMo
         status: 'synced',
       };
 
-      await fetch(webhookUrl.trim(), {
+      const response = await fetch(webhookUrl.trim(), {
         method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(testPayload),
       });
 
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setIsTesting(false);
-      setTestStatus('✓ Requête envoyée ! Vérifiez que la ligne apparaît dans votre feuille Google Sheet.');
+      setTestStatus('✓ Liaison confirmée. Vérifiez que la ligne apparaît dans votre feuille Google Sheet.');
     } catch (err: any) {
       setIsTesting(false);
       setTestStatus(`Erreur lors du test: ${err.message}`);

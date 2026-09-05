@@ -27,17 +27,21 @@ export function ProfileSetupModal({ isOpen, user, onSave }: ProfileSetupModalPro
     }
   }, [user]);
 
+  const [isSaving, setIsSaving] = useState(false);
+
   if (!isOpen || !user) return null;
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (!name.trim() || !cabinet.trim() || !localite.trim()) {
       setError('Veuillez remplir obligatoirement tous les champs requis.');
       return;
     }
 
+    setIsSaving(true);
     try {
-      const updated = storage.updateProfile(user.id, {
+      const updated = await storage.updateProfile(user.id, {
         name: name.trim(),
         localite: localite.trim(),
         cabinet: cabinet.trim(),
@@ -45,8 +49,10 @@ export function ProfileSetupModal({ isOpen, user, onSave }: ProfileSetupModalPro
         action: action.trim(),
       });
       onSave(updated);
-    } catch (err: any) {
-      setError(err?.message || 'Erreur lors de la mise à jour du profil');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour du profil');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -151,10 +157,11 @@ export function ProfileSetupModal({ isOpen, user, onSave }: ProfileSetupModalPro
 
           <button
             type="submit"
-            className="w-full mt-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+            disabled={isSaving}
+            className="w-full mt-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>Valider et Accéder aux Saisies</span>
+            <span>{isSaving ? 'Enregistrement…' : 'Valider et accéder aux saisies'}</span>
           </button>
         </form>
       </div>

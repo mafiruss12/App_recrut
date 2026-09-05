@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { ClientEntry, Commercial } from '../types';
 import { storage } from '../lib/storage';
-import { exportToExcel, exportToCSV, exportToPDF } from '../lib/export';
+
 
 interface ManagerDashboardProps {
   onRefresh: () => void;
@@ -185,20 +185,23 @@ export function ManagerDashboard({
   }, [allClients]);
 
   // Handlers for export
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     setIsExporting(true);
     try {
-      exportToExcel(filteredClients, `K2L_Recrutement_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      const { exportToExcel } = await import('../lib/export');
+      exportToExcel(filteredClients, `K2L_Recrutement_Export_${new Date().toISOString().slice(0, 10)}.csv`);
     } finally {
       setIsExporting(false);
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
+    const { exportToCSV } = await import('../lib/export');
     exportToCSV(filteredClients, `K2L_Recrutement_Export_${new Date().toISOString().slice(0, 10)}.csv`);
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
+    const { exportToPDF } = await import('../lib/export');
     exportToPDF(filteredClients, 'Rapport Recrutement K2L - Direction');
   };
 
@@ -212,12 +215,7 @@ export function ManagerDashboard({
 
     setSyncFeedback('Synchronisation en cours avec Google Sheets...');
     try {
-      await fetch(settings.googleSheetsWebhookUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(filteredClients),
-      });
+      await storage.syncClientsToGoogleSheets(filteredClients);
       setSyncFeedback(`✓ ${filteredClients.length} clients envoyés avec succès à Google Sheets !`);
       setTimeout(() => setSyncFeedback(null), 4000);
     } catch (err: any) {
@@ -261,7 +259,7 @@ export function ManagerDashboard({
             className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-semibold border border-white/10 flex items-center gap-1.5 transition-all"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            <span>Excel (.xlsx)</span>
+            <span>Excel compatible (.csv)</span>
           </button>
 
           <button
@@ -621,12 +619,19 @@ export function ManagerDashboard({
                         className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
                           client.status === 'synced'
                             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : client.status === 'failed'
+                              ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                         }`}
+                        title={client.sync_error || undefined}
                       >
                         {client.status === 'synced' ? (
                           <>
                             <CheckCircle2 className="w-3 h-3" /> Synchro
+                          </>
+                        ) : client.status === 'failed' ? (
+                          <>
+                            <ShieldAlert className="w-3 h-3" /> Échec
                           </>
                         ) : (
                           <>

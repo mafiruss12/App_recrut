@@ -1,18 +1,23 @@
+export type UserRole = 'commercial' | 'manager';
+
 export interface Commercial {
   id: string;
+  user_id?: string;
   phone: string;
-  code: string;
+  /** Never returned to the browser. Kept optional for legacy cache compatibility. */
+  code?: string;
   name: string;
   localite: string;
   cabinet: string;
   partenaire: string;
   action: string;
-  role: 'commercial' | 'manager';
+  role: UserRole;
   is_active: boolean;
   created_at: string;
   last_active_at: string;
-  session_token?: string;
 }
+
+export type ClientStatus = 'synced' | 'pending' | 'syncing' | 'failed' | 'duplicate_blocked';
 
 export interface ClientEntry {
   id: string;
@@ -25,11 +30,13 @@ export interface ClientEntry {
   localite: string;
   partenaire: string;
   action: string;
-  status: 'synced' | 'pending' | 'duplicate_blocked';
+  status: ClientStatus;
   notes?: string;
   created_at: string;
   synced_at?: string;
   synced_to_sheets?: boolean;
+  sync_error?: string;
+  sync_attempts?: number;
 }
 
 export interface DuplicateCheckResult {
@@ -50,8 +57,6 @@ export interface SyncStats {
 }
 
 export interface AppSettings {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
   googleSheetsWebhookUrl: string;
   autoSyncGoogleSheets: boolean;
   enableDuplicateStrictBlocking: boolean;

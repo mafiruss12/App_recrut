@@ -1,0 +1,18 @@
+{
+  "name": "K2L Suivi Recrutement",
+  "short_name": "K2L Recrut",
+  "description": "Saisie terrain sécurisée et suivi des recrutements K2L.",
+  "lang": "fr",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
